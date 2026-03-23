@@ -1,0 +1,254 @@
+---
+title: "Horror Movies Project for MATH 250"
+format: html
+author: "Diego Perez"
+embed-resources: true
+---
+
+## Thinking about horror movies
+
+We begin to question ourselves what we might believe contributes to a movie's ratings. What could possibly predict or 'sniff out' what might be the next great movie that captures everyone's attention? Could the most well known movies have something in common, such as what they present themselves with in their taglines? What about the budget given for such a movie? Do certain genres influence their ratings? How do the ratings themselves come into play, such as do they result in more ratings?
+
+When we think about horror movies, we think about the typical dark ambiance and the (somewhat annoying) jumpscares that occur in any typical movie. We usually explore these movies as a 'safe way' to test our fears and phobias without the necessity to obligate ourselves to be in these situations. We experience fear through these movies as we are still subjected to the same eerie feeling of the unknown even on a screen. This is why we continue to watch these films despite the unpleasant feeling attached, as we can simply discard said feeling after the movie has ended. This also gives us the opportunity to explore various dark themes (monsters, supernatural, the 'unknown').[^1]
+
+[^1]: [Wikipedia Article On Horror Film](https://en.wikipedia.org/wiki/Horror_film)
+
+This fear is generally beneficial for both parties, as movie production is able to capture the attention of the audience more explicitly and efficiently. As well, it's a great tactic for the viewer to keep and retain their memory and or thoughts on the movie (for movie talks, or what it may be). We have a stronger affinity for retaining memories if events are more frequently 'emotion heavy', or in other words have a significant provocation of the person's emotions. As we have fear for one of our primary emotions (or emotional state, that's for debate), this evocation is used throughout the movie. The suspense is a key contributor as well, as we 'fear the fear' of upcoming jumpscares and or intense moments.[^2]
+
+[^2]: [Lecture on fear](https://www.youtube.com/watch?v=JYPGip24LUs)
+
+For example, this constant suspense is found in analog horror which has been adapted for a variety of purposes.[^3] A genre that revolves around manipulating the audience's knowledge on established horror films that rely heavily on jumpscares (that frequently never occur). This constant blank-slate genre plays with the unknown frequently, featuring snapshots of dark (or low-lit) spaces. This specific genre derives from 'Paranormal Activity' (2009), which itself has been praised for a new concept of this constant suspense that relies on the audience's knowledge on previous films. Which leads back to our original question if something as simple as budgeting influencing our film (PA worked with a \$15000 budget)?
+
+[^3]: This is a personal note, but this genre has been dragged to the ground which is not great. People placing their EAS warnings over an 'analog filter' is not analog horror! I think the genre is a great example here (given the more higher quality ones), solely because fear can be used as a constant state in these movies rather than a simple reaction that we constantly find in these movies. Incorporating these constant fear of the unknowns to a maximum level that has an audience on their feet waiting for something, to find nothing (to which the cycle repeats and amplifies).
+
+## Setting up our enviroment
+
+```{r}
+#| warning: false
+#| message: false
+library(tidyverse)
+library(gt)
+horror <- read_csv("horror_movies.csv")
+```
+
+## Data Exploration
+
+```{r}
+#| warning: false
+#| message: false
+
+horror[horror == 0] <- NA # 4
+
+horror %>% 
+  ggplot(aes(x = vote_average,
+             y = revenue,
+             color = revenue)) +
+  geom_point(show.legend = FALSE) +
+  geom_jitter(alpha = 0.7, width = 0.1) +
+  ylim(0, 1e8) +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_minimal() +
+  labs(x = "Vote Average (out of 10)",
+       y = "Revenue (in millions)",
+       alt = "A scatter plot that is displayed as a loose bell curve,
+              Given Vote_average (out of 10) of a movie on the x-axis,
+              and the revenue of that movie on the y-axis.
+              The limit has been capped to revenue of 100 million, to prevent compression.") +
+  theme(legend.position = "none")
+
+
+horror %>% 
+  ggplot(aes(x = vote_average,
+             y = vote_count,
+             color = vote_count)) +
+  geom_point()  +
+  geom_jitter(alpha = 0.7, width = 0.1) +
+  ylim(0, 10000) +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_minimal() +
+  labs(x = "Vote Average (out of 10)",
+       y = "Vote Counts",
+       alt = "A scatter plot that is displayed as a tight bell curve,
+              Given Vote_average (out of 10) of a movie on the x-axis,
+              and the vote count of that movie on the y-axis.
+              The limit has been capped to revenue of 10000, to prevent compression.") +
+  theme(legend.position = "none")
+
+```
+
+Code borrowed from here.[^4] Take the dataframe, find all values that are equal to zero and reassign those values to NA. This is useful, as we do have a significant amount of 0s. While these 0s could be interpreted as 'nothing' in a literal sense (no budget, no revenue), we can understand that these represent missing data. It's more understandable to place NAs in this data, rather than let the 0s skew our data.
+
+The vote counts are definitely more compact and less spread out compared to the revenue, though they both show a bell curve rather than a random selection of points. That might be a good indicator of what might contribute to a good film, given how the median is around ~6.25 (out of 10). Revenue is a little more difficult to analyze, but it's noticeable that the bell curve is showing some indication that revenue would give a better vote rating.
+
+[^4]: [Set all 0s in a dataframe NA, Very similar to python's method](https://stackoverflow.com/questions/11036989/replace-all-0-values-to-na)
+
+## Releases and vote count by month
+
+Let's consider this for a minute. Does a certain time have a certain influence on whether a movie might have better ratings? During the warmer periods (of the Northern Hemisphere), people are frequently more outside due to summer vacations or a temporary break in their work/job. Would it be reasonable to assume that because of these vacations, that movies are more likely to be released to capture this more active audience, and therefore release 'higher quality' films that would harvest higher ratings?
+
+```{r}
+horror <- horror %>%
+  filter(!is.na(release_date)) %>% 
+  mutate(months = month(release_date, label = TRUE, abbr = TRUE), # 5
+         year = year(release_date),
+         total_years = n_distinct(year))
+
+monthly_pop <- horror %>% 
+  group_by(months) %>%
+  summarize(avg_rating = mean(vote_average, na.rm = TRUE),
+            months_count = n(),
+            avg_movies = mean(months_count/total_years))
+
+
+ggplot(monthly_pop, aes(x = months,
+                        y = avg_movies,
+                        fill = months)) +
+  
+  geom_col(show.legend=FALSE) +
+  labs(title = "Releases per Month (average)",
+       x = "Release Month",
+       y = "Average Releases",
+       alt = "A bar graph that demonstrates the amount of releases of horror movies per month,
+              across all the years. They have a rainbow scale and shows a peak on the months
+              of Janurary and October, due to reasons below.") +
+  scale_fill_brewer(palette = "Paired") +
+  theme_minimal()
+
+
+ggplot(monthly_pop, aes(x = months,
+                        y = avg_rating,
+                        fill = months)) +
+  geom_bar(stat = "identity", show.legend=FALSE) +
+  labs(title = "Average Movie Rating by Release Month",
+       x = "Release Month",
+       y = "Average Rating",
+       alt = "A bar graph that demonstrates the average movie rating of horror movies per month,
+              across all the years. They have a rainbow scale and shows a consistent bar graph
+              across all months, with some error between 0.5, with Janurary being the lowest.") +
+  scale_fill_brewer(palette = "Paired") +
+  theme_minimal()
+
+```
+
+Code borrowed from here. [^5] Take the month from the datas, grab the labels (jan, feb...) and cut the full names out.
+
+[^5]: [Grab the month labels](https://codepointtech.com/mastering-r-how-to-group-data-by-month-effectively/)
+
+Actually, we do have this interesting phenomenon called "Dump Months", where movies are often released during these 'down' periods (mainly Jan/Feb, sometimes Sep/Oct) in which movies of lower quality and or smaller studio films are released. These are usually released during these months because of the lack of competition with movies with larger studios.[^6] Typical A-list horror movies are often released in the summer (which coincides with the previous point of summer vacation). This does display in our graphs, as we see a sudden influx of films released in janurary (but interestingly a lack in feburary). It's also worth mentioning that there's going to be a spike in october, given how it's halloween month. While these "Dump Months" are meant for a quick release that hadn't exceeded expectations or recieved unenthusiastic reception, there actually had been a fair amount of movies that did break this 'rule' such as 'Black Panther' and 'Get Out'.[^7]
+
+[^6]: [Dump Months: Wikipedia](https://en.wikipedia.org/wiki/Dump_months)
+
+[^7]: [Dump Months with Certain Films](https://filmlifestyle.com/dump-months-in-film/)
+
+Average ratings are relatively consistent across months, suggesting little to no strong seasonal pattern in ratings. Interestingly, Janurary is the lowest of the average ratings, which does go back to "Dump Months". The movies are indicated as lower quality with higher output.
+
+## Our outliers
+
+Let's look at our outliers, as they have been cut from the previous graphs due to data obfuscation of the other points. Unfortunately, there was a necessity to prevent our data from 'squishing' together and form a line rather than display what we have. These outliers are extreme, so let's take good look.
+
+
+```{r}
+display_outlier_five <-
+  function(dataframe, column) {
+    {{dataframe}} %>%
+      arrange(desc({{column}})) %>% # 8
+      select(title, release_date, vote_average, vote_count, revenue) %>%
+      head(n = 5) %>% 
+      gt() %>% 
+      cols_label(
+        title = "Movie Title",
+        release_date = "Release Date",
+        vote_average = "Average Rating",
+        vote_count = "Number of Votes",
+        revenue = "Revenue (in USD)"
+      )
+  }
+display_outlier_five(horror, vote_count)
+display_outlier_five(horror, revenue)
+
+```
+
+Source for double curlies (forces to use parameters/arguments)[^8].
+
+Now, it's interesting to see how horror has made a 'comeback' (if you'd like to call it that) for the most part of the 2010s (see more below on 80s and 90s movies). Most of the higher rated movies did have a slight overlap with films such as 'It' (howand the sequel) + World War Z in Vote Count and Revenue. 
+
+It is easier to explain for its success, given around 2016 the sightings of 'killer clowns' on the loose (do people still remember that?). While It (itself) wasn't inspired by these sightings, it was a good movie at the right time given those fears in the general public, and explored these fears more interestingly with modern technology. It's actually possible that these sightings were an actual campaign for this movie (this claim isn't factual, though).[^9]
+
+World War Z has its best interest in how extremely realistic (for the time) was compared to it's predecessors during that time. Due to the technology given, they were able to capture the pandemic AND the zombie theme within the same movie which utilized said technology to bring this constant suspense (unlike earlier, though) AND the amount of constant movement that brought a different view on horror movies.[^10]
+
+These films were definitely apmplified by the amount of vote counts (and popularity for vote counts) that launched it with its unique timing of their proper releases. However, these times are very important because of how they were released outside of this certain period as mentioned earlier, which meant that they had a greater freedom to work with this newer technology that explored these fears more realistically AND efficently. 
+
+[^8]: [Double curly reference](https://www.geeksforgeeks.org/r-language/how-do-double-curly-brackets-work-in-dplyr/)
+[^9]: [Killer Clowns Wikipedia](https://en.wikipedia.org/wiki/2016_clown_sightings#Warnings)
+[^10]: [World War Z (FILM) Wikipedia](https://en.wikipedia.org/wiki/World_War_Z_(film))
+
+## Rating over time
+
+What about trends over time? Do they tell us anything about how ratings were over the years? Does it hide a bigger picture that history can tell us?
+
+```{r}
+
+horror_line <- horror %>%
+  mutate(year = year(release_date)) %>%
+  group_by(year) %>%
+  summarize(avg_vote = mean(vote_average, na.rm = TRUE))
+
+ggplot(horror_line, aes(x = year,
+                        y = avg_vote)) +
+  geom_line(linewidth = 1.5, color = "red") +
+  labs(title = "Average Horror Movie Rating Over Years",
+       x = "Year",
+       y = "Average Rating (out of 10",
+       alt = "A line graph that demonstrates teh average rating for all movies given a year.
+              There is a strong (but rocky) rating above 5 for all movies before 1980,
+              before a decline that started after 1980, with its decline until 2010.
+              It spikes from 4.5 to 6 between the years 2010 and 2022.") +
+  theme_minimal()
+
+```
+
+We do see a large dip and decline starting around the ~80s and significantly around the late 90s and early 2000s. The 2000s are more explainable, as we know after the attacks of September 11th, we were unable to put more fear in our films without having to reference a sensitive topic to most Americans during the time. Most horror couldn't mirror the 'moral panic' nor the cultural fears in that time after because of these attacks and how drastic they had on the American people (and how looked down upon it was to talk about it in general).[^11] We do see a steady decline between the time preceding it, though. Between the 80s and 90s, The release of horror films was surrounded with the "Satanic Panic" around that period, along with the films having to become 'cleaner' to avoid getting their films confiscated by the police! According to Newman: "[horror movies are] dumber than the previous decade" and although films were not less gory, they were "more lightweight [...] becoming more disposable, less personal works." It's because of this scarcity and lack of freedom that lead to a decline in horror (before even the attacks) that lead to a desperation that forced producers to rely on sequels before moving original ideas back to the big screen.[^12]
+
+
+[^11]: [How did horror reflect the time periods?](https://news.asu.edu/20241028-arts-humanities-and-education-horror-films-reflections-societys-deepest-fears-and-cultural)
+[^12]: [80s and 90s quick history](https://en.wikipedia.org/wiki/History_of_horror_films)
+
+## Popularity limitation
+
+This dataset had a popularity column that described a movie's popularity with an unknown unit (without any given comparison that might be valid). Due to this, this column had to be discarded and not taken seriously (even if it meant trimming the data), mainly because there is no solid base that could indicate something useful. Upon looking at the API of the origin of this dataset, popularity actually might represent the 'trending' movies of that time period in which it has been published, rather than overall popularity. According to the API:[^13]
+
+-   Number of votes for the day
+
+-   Number of views for the day
+
+-   Number of users who marked it as a "favourite" for the day
+
+-   Number of users who added it to their "watchlist" for the day
+
+-   Release date
+
+-   Number of total votes
+
+-   Previous days score. 
+
+Which mainly skews towards the newer movies that is popular, rather than overall popularity. Think of the previous section that dealt with World War Z or It. 
+
+```{r}
+horror %>% 
+  arrange(desc(popularity)) %>% 
+        select(title, release_date, popularity) %>%
+        head(n = 7) %>%
+        gt() %>% 
+        cols_label(
+          title = "Movie Title",
+          release_date = "Release Date",
+          popularity = "Popularity"
+        )
+```
+[^13]: [TMDB API](https://developer.themoviedb.org/docs/popularity-and-trending)
+
+
+## Conclusion
+
+We saw different aspects that could've affected our ratings, and we saw a good correlation between the amount of vote counts (and it might be circular), and how the timing (yearly and monthly) affected the ratings of a movie. The revenue also gave leeway for more ratings as well! 
+What do you think, do we have anything else that could affect it?
